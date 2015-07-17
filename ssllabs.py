@@ -4,46 +4,36 @@ import json
 import time
 import multiprocessing
 
-API_URL = 'https://api.ssllabs.com/api/v2/'
-DEBUG = False
-
-
-def debug(msg=None):
-   if DEBUG and msg:
-       print('[DEBUG] {}'.format(msg))
-
-
-def error(msg=None):
-    if msg:
-        print('[ERROR] {}'.format(msg))
-    sys.exit(1)
-
-
-def info(msg=None):
-    if msg:
-        print('[INFO] {}'.format(msg))
-
-
 try:
     import requests
 except ImportError:
-    error('requests module is not available')
+    print('requests module is not available')
+    sys.exit(1)
+
+__version__ = '0.9'
+__author__ = 'takeshix@adversec.com'
+__all__ = ['SSLLabsAssessment']
 
 
 def parse_arguments():
     from argparse import ArgumentParser
     global cli_args
-    parser = ArgumentParser()
-    parser.add_argument('host', help='Hostname which should be scanned')
-    parser.add_argument('--ignore-mismatch', action='store_true', default=False, help='Certificate hostname mismatch does not stop assessment')
-    parser.add_argument('--use-cache', action='store_true', default=False, help='Accept cached results (if available)')
-    parser.add_argument('-q', action='store_true', default=False, help='Suppress any output, just print the results')
-    parser.add_argument('-v', action='store_true', default=False, help='Enable verbose output')
-    parser.add_argument('-d', action='store_true', default=False, help='Enable debug output')
+    parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(version=__version__))
+    parser.add_argument('host', help='hostname which should be assessed')
+    parser.add_argument('--resume', action='store_true', default=False, help='get the status of a running assessment')
+    parser.add_argument('--publish', action='store_true', default=False, help='publish results on public results board')
+    parser.add_argument('--ignore-mismatch', action='store_true', default=False, help='certificate hostname mismatch does not stop assessment')
+    parser.add_argument('--use-cache', action='store_true', default=False, help='accept cached results (if available)')
+    parser.add_argument('--max-age', metavar='N', default=5, type=int, help='max age (in hours) of cached results')
+    parser.add_argument('--api-url', metavar='URL', default=False, help='use another API URL than the default')
+    parser.add_argument('-q', action='store_true', default=False, help='suppress any output, just print the results')
+    parser.add_argument('-v', action='store_true', default=False, help='enable verbose output')
+    parser.add_argument('-d', action='store_true', default=False, help='enable debug output')
     cli_args = parser.parse_args()
 
 
 class SSLLabsAssessment(object):
+    API_URL = 'https://api.ssllabs.com/api/v2/'
     MAX_ASSESSMENTS = 25
     CLIENT_MAX_ASSESSMENTS = 25
     CURRENT_ASSESSMENTS = 0
@@ -51,9 +41,12 @@ class SSLLabsAssessment(object):
     VERBOSE = False
     QUIET = False
     
-    def __init__(self, host=None, debug=False, verbose=False, quiet=False):
+    def __init__(self, host=None, debug=False, verbose=False, quiet=False, api_url=None, *args, **kwargs):
         if host:
             self.host = host
+
+        if api_url:
+            self.API_URL = api_url
 
         self.DEBUG = debug
         self.VERBOSE = verbose
@@ -68,116 +61,156 @@ class SSLLabsAssessment(object):
         self.host = host
 
 
+    def _die_on_error(self, msg):
+        if msg:
+            print(msg)
+        sys.exit(1)
+
+
     def _handle_api_error(self, response):
         _status = response.status_code
 
         if _status == 200:
             return response
         elif _status == 400:
-            error('[API] invocation error: {}'.format(response.text))
+            self._die_on_error('[API] invocation error: {}'.format(response.text))
         elif _status == 429:
-            error('[API] client request rate too high or too many new assessments too fast: {}'.format(response.text))
+            self._die_on_error('[API] client request rate too high or too many new assessments too fast: {}'.format(response.text))
         elif _status == 500:
-            error('[API] internal error: {}'.format(response.text))
+            self._die_on_error('[API] internal error: {}'.format(response.text))
         elif _status == 503:
-            error('[API] the service is not available: {}'.format(response.text))
+            self._die_on_error('[API] the service is not available: {}'.format(response.text))
         elif _status == 529:
-            error('[API] the service is overloaded: {}'.format(response.text))
+            self._die_on_error('[API] the service is overloaded: {}'.format(response.text))
         else:
-            error('[API] unknown status code: {}, {}'.format(_status, response.text))
+            self._die_on_error('[API] unknown status code: {}, {}'.format(_status, response.text))
 
 
     def _check_api_info(self):
         try:
-            response = self._handle_api_error(requests.get('{}/info'.format(API_URL)))
+            response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL)))
             self.MAX_ASSESSMENTS = response.json().get('maxAssessments')
             self.CLIENT_MAX_ASSESSMENTS = response.json().get('clientMaxAssessments')
             self.CURRENT_ASSESSMENTS = response.json().get('currentAssessments')
 
             if self.MAX_ASSESSMENTS<=0:
-                debug('Rate limit reached')
+                if self.DEBUG:
+                    print('Rate limit reached')
                 return False
 
             return True
         except Exception as e:
-            debug(e)
+            if self.DEBUG:
+                print(e)
             return False
 
 
     def _trigger_new_assessment(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&fromCache={from_cache}&'
-        _url += 'maxAge={max_age}&all={return_all}&ignoreMismatch={ignore_mismatch}&startNew=on'
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
-            api_url=API_URL,
+            api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            from_cache=self.from_cache,
-            max_age=self.max_age,
-            return_all=self.return_all,
             ignore_mismatch=self.ignore_mismatch
         )
-        self._handle_api_error(requests.get(_url))
+        if self.from_cache == 'on':
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url = _url.format(
+                from_cache=self.from_cache,
+                max_age=self.max_age
+            )
+        else:
+            _url += '&startNew=on'
+
+        try:
+            self._handle_api_error(requests.get(_url))
+            return True
+        except Exception as e:
+            if self.DEBUG:
+                print(e)
+            return False
 
 
     def _poll_api(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&fromCache={from_cache}&'
-        _url += 'maxAge={max_age}&ignoreMismatch={ignore_mismatch}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
-            api_url=API_URL,
+            api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            from_cache=self.from_cache,
-            max_age=self.max_age,
             ignore_mismatch=self.ignore_mismatch
         )
-        return self._handle_api_error(requests.get(_url)).json()
+        if self.from_cache == 'on':
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url = _url.format(
+                from_cache=self.from_cache,
+                max_age=self.max_age
+            )
+
+        try:
+            return self._handle_api_error(requests.get(_url)).json()
+        except Exception as e:
+            if self.DEBUG:
+                print(e)
+            return False
 
 
     def _get_all_results(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&fromCache={from_cache}&'
-        _url += 'maxAge={max_age}&all={return_all}&ignoreMismatch={ignore_mismatch}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
-            api_url=API_URL,
+            api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            from_cache=self.from_cache,
-            max_age=self.max_age,
             return_all=self.return_all,
             ignore_mismatch=self.ignore_mismatch
         )
-        return self._handle_api_error(requests.get(_url)).json()
+        if self.from_cache == 'on':
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url = _url.format(
+                from_cache=self.from_cache,
+                max_age=self.max_age
+            )
+        try:
+            return self._handle_api_error(requests.get(_url)).json()
+        except Exception as e:
+            if self.DEBUG:
+                print(e)
+            return False
 
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
         url = '{api_url}/getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
-            api_url=API_URL,
+            api_url=self.API_URL,
             host=host,
             endpoint_ip=ip,
             from_cache=from_cache
         )
 
-        try:
-            while True:
+        while True:
+            try:
                 response = self._handle_api_error(requests.get(url)).json()
-
-                if self.VERBOSE:
-                    info('[{ip_address}] Progress: {progress}%, Status: {status}'.format(
-                        ip_address=response.get('ipAddress'),
-                        progress=response.get('progress'),
-                        status=response.get('statusDetailsMessage')
-                        )
+                print('[INFO] [{ip_address}] Progress: {progress}%, Status: {status}'.format(
+                    ip_address=response.get('ipAddress'),
+                    progress='{}'.format(response.get('progress')) if response.get('progress')>-1 else '0',
+                    status=response.get('statusDetailsMessage')
                     )
-
+                )
                 if response.get('progress') == 100:
                     return
-
+                elif response.get('progress')<0:
+                    time.sleep(10)
+                else:
+                    time.sleep(5)
+            except KeyboardInterrupt:
+                return
+            except Exception as e:
+                if self.DEBUG:
+                    print(e)
                 time.sleep(5)
-        except KeyboardInterrupt:
-            return
+                continue
 
 
     def analyze(self, host=None, publish='off', start_new='on', from_cache='off',
-        max_age=0, return_all='done', ignore_mismatch='on', *args, **kwargs):
+        max_age=5, return_all='done', ignore_mismatch='on', resume=False, *args, **kwargs):
 
         if not self._check_api_info():
             return False
@@ -189,40 +222,59 @@ class SSLLabsAssessment(object):
 
         self.publish = publish
         self.start_new = start_new
+        self.return_all = return_all
         self.from_cache = from_cache
         self.max_age = max_age
-        self.return_all = return_all
         self.ignore_mismatch = ignore_mismatch
-        self._trigger_new_assessment()
 
-        if not self.QUIET:
-            info('Assessment of {} started...'.format(self.host))
+        if not resume:
+            if not self.QUIET:
+                print('[INFO] Retrieving assessment for {}...'.format(self.host))
+
+            if not self._trigger_new_assessment():
+                return False
+        else:
+            if not self.QUIET:
+                print('[INFO] Checking running assessment for {}'.format(self.host))
 
         while True:
             _status = self._poll_api()
             if _status.get('status') == 'IN_PROGRESS':
+                if not self.QUIET and resume:
+                    print('[INFO] Assessment is still in progress')
                 break
+            elif _status.get('status') == 'READY':
+                if not self.QUIET and resume:
+                    print(
+                        '[INFO] No running assessment. Use --use-cache '+
+                        'to receive a cached assessment, or start a new one.'
+                    )
+                    return
+                else:
+                    return self._get_all_results()
             elif _status.get('status') == 'ERROR':
-                error('An error occured: {}'.format(_status.errors))
+                print('An error occured: {}'.format(_status.errors))
+                return
             else:
                 continue
 
         if self.VERBOSE:
-            info('Testing {} host(s)'.format(len(_status.get('endpoints'))))
+            print('[INFO] Testing {} host(s)'.format(len(_status.get('endpoints'))))
 
         self.manager = multiprocessing.Manager()
         self.endpoint_jobs = []
 
         try:
-            for endpoint in _status.get('endpoints'):
-                _process = multiprocessing.Process(
-                        target=self._get_detailed_endpoint_information, args=(self.host, endpoint.get('ipAddress'))
-                )
-                self.endpoint_jobs.append(_process)
-                _process.start()
+            if self.VERBOSE:
+                for endpoint in _status.get('endpoints'):
+                    _process = multiprocessing.Process(
+                            target=self._get_detailed_endpoint_information, args=(self.host, endpoint.get('ipAddress'))
+                    )
+                    self.endpoint_jobs.append(_process)
+                    _process.start()
 
-            for job in self.endpoint_jobs:
-                job.join()
+                for job in self.endpoint_jobs:
+                    job.join()
 
             while True:
                 _status = self._poll_api()
@@ -233,50 +285,60 @@ class SSLLabsAssessment(object):
                 _host_status = _status.get('status')
 
                 if _host_status == 'IN_PROGRESS':
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
+                    if not self.QUIET:
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
                     time.sleep(10)
                 elif _host_status == 'READY':
                     return self._get_all_results()
                 elif _host_status == 'ERROR':
-                    error('An error occured: {}'.format(_status.errors))
+                    print('[ERROR] An error occured: {}'.format(_status.errors))
+                    return
                 elif _host_status == 'DNS':
-                    if VERBOSE:
-                        info('Resolving hostname')
+                    if self.VERBOSE:
+                        print('[INFO] Resolving hostname')
                     time.sleep(4)
                 else:
-                    info('Unknown host status: {}'.format(_host_status))
+                    print('[INFO] Unknown host status: {}'.format(_host_status))
         except KeyboardInterrupt:
             pass
         except:
-            return False
+            return
 
             
 def main():
     try:
         parse_arguments()
-
-        if cli_args.d:
-            DEBUG = True
+        global DEBUG
+        DEBUG = cli_args.d
 
         assessment = SSLLabsAssessment(
             host=cli_args.host,
+            debug=cli_args.d,
             verbose=cli_args.v,
-            quiet=cli_args.q
+            quiet=cli_args.q,
+            api_url=cli_args.api_url
         )
         info = assessment.analyze(
             ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
-            from_cache='on' if cli_args.use_cache else 'off'
+            from_cache='on' if cli_args.use_cache else 'off',
+            max_age=cli_args.max_age,
+            publish='on' if cli_args.publish else 'off',
+            resume=cli_args.resume
         )
 
         if not info:
-            debug('Got no report')
+            if DEBUG:
+                print('[DEBUG] Got no report')
             return 1
 
         # TODO: Implement proper printing of some values
-        print(info)
+        print(json.dumps(info, indent=4, sort_keys=True))
+
+        return 0
     except Exception as e:
-        debug(e)
+        if DEBUG:
+            print(e)
         return 1
 
 
