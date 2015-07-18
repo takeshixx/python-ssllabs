@@ -88,15 +88,24 @@ class SSLLabsAssessment(object):
 
     def _check_api_info(self):
         try:
-            response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL)))
-            self.MAX_ASSESSMENTS = response.json().get('maxAssessments')
-            self.CLIENT_MAX_ASSESSMENTS = response.json().get('clientMaxAssessments')
-            self.CURRENT_ASSESSMENTS = response.json().get('currentAssessments')
+            response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL))).json()
+            self.MAX_ASSESSMENTS = response.get('maxAssessments')
+            self.CLIENT_MAX_ASSESSMENTS = response.get('clientMaxAssessments')
+            self.CURRENT_ASSESSMENTS = response.get('currentAssessments')
 
             if self.MAX_ASSESSMENTS<=0:
                 if self.DEBUG:
                     print('Rate limit reached')
                 return False
+
+            if not self.QUIET:
+                print('[NOTICE] SSL Labs v{engine_version} (criteria version {criteria_version})'.format(
+                    engine_version=response.get('engineVersion'),
+                    criteria_version=response.get('criteriaVersion')
+                ))
+                print('[NOTICE] {server_message}'.format(
+                    server_message=response.get('messages')[0]
+                ))
 
             return True
         except Exception as e:
