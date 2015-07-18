@@ -11,7 +11,7 @@ except ImportError:
     sys.exit(1)
 
 
-__version__ = '0.9'
+__version__ = '1.0'
 __author__ = 'takeshix@adversec.com'
 __license__ = 'Apache 2.0'
 __all__ = ['SSLLabsAssessment']
@@ -19,7 +19,6 @@ __all__ = ['SSLLabsAssessment']
 
 def parse_arguments():
     from argparse import ArgumentParser
-    global cli_args
     parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(version=__version__))
     parser.add_argument('host', help='hostname which should be assessed')
     parser.add_argument('--resume', action='store_true', default=False, help='get the status of a running assessment')
@@ -31,7 +30,7 @@ def parse_arguments():
     parser.add_argument('-q', action='store_true', default=False, help='suppress any output, just print the results')
     parser.add_argument('-v', action='store_true', default=False, help='enable verbose output')
     parser.add_argument('-d', action='store_true', default=False, help='enable debug output')
-    cli_args = parser.parse_args()
+    return parser.parse_args()
 
 
 class SSLLabsAssessment(object):
@@ -351,11 +350,8 @@ class SSLLabsAssessment(object):
 
             
 def main():
+    cli_args = parse_arguments()
     try:
-        parse_arguments()
-        global DEBUG
-        DEBUG = cli_args.d
-
         assessment = SSLLabsAssessment(
             host=cli_args.host,
             debug=cli_args.d,
@@ -372,7 +368,7 @@ def main():
         )
 
         if not info:
-            if DEBUG:
+            if cli_args.d:
                 print('[DEBUG] Got no report')
             return 1
 
@@ -381,7 +377,7 @@ def main():
 
         return 0
     except Exception as e:
-        if DEBUG:
+        if cli_args.d:
             print(e)
         return 1
 
