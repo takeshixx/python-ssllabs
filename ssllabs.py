@@ -10,8 +10,10 @@ except ImportError:
     print('requests module is not available')
     sys.exit(1)
 
+
 __version__ = '0.9'
 __author__ = 'takeshix@adversec.com'
+__license__ = 'Apache 2.0'
 __all__ = ['SSLLabsAssessment']
 
 
@@ -33,6 +35,19 @@ def parse_arguments():
 
 
 class SSLLabsAssessment(object):
+    """A basic API interface which eases the creation of SSL Labs assessments.
+
+    See the *analyze* function for more information.
+
+    For any information regarding the stable SSL Labs API, see the official documentation:
+
+        * https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
+
+    Note: SSL Labs also provides a dev API which can also be used with this module, see:
+
+        * https://api.dev.ssllabs.com/api/v2
+        * https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
+    """
     API_URL = 'https://api.ssllabs.com/api/v2/'
     MAX_ASSESSMENTS = 25
     CLIENT_MAX_ASSESSMENTS = 25
@@ -56,16 +71,17 @@ class SSLLabsAssessment(object):
             self.DEBUG = False
             self.VERBOSE = False
 
-
     def set_host(self, host):
-        self.host = host
+        """Set the target FQDN.
 
+        This public function can be used to set the target FQDN after the object has already been initialized.
+        """
+        self.host = host
 
     def _die_on_error(self, msg):
         if msg:
             print(msg)
         sys.exit(1)
-
 
     def _handle_api_error(self, response):
         _status = response.status_code
@@ -84,7 +100,6 @@ class SSLLabsAssessment(object):
             self._die_on_error('[API] the service is overloaded: {}'.format(response.text))
         else:
             self._die_on_error('[API] unknown status code: {}, {}'.format(_status, response.text))
-
 
     def _check_api_info(self):
         try:
@@ -113,7 +128,6 @@ class SSLLabsAssessment(object):
                 print(e)
             return False
 
-
     def _trigger_new_assessment(self):
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
@@ -139,7 +153,6 @@ class SSLLabsAssessment(object):
                 print(e)
             return False
 
-
     def _poll_api(self):
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
@@ -161,7 +174,6 @@ class SSLLabsAssessment(object):
             if self.DEBUG:
                 print(e)
             return False
-
 
     def _get_all_results(self):
         _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&ignoreMismatch={ignore_mismatch}'
@@ -185,7 +197,6 @@ class SSLLabsAssessment(object):
                 print(e)
             return False
 
-
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
         url = '{api_url}/getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
             api_url=self.API_URL,
@@ -199,13 +210,13 @@ class SSLLabsAssessment(object):
                 response = self._handle_api_error(requests.get(url)).json()
                 print('[INFO] [{ip_address}] Progress: {progress}%, Status: {status}'.format(
                     ip_address=response.get('ipAddress'),
-                    progress='{}'.format(response.get('progress')) if response.get('progress')>-1 else '0',
+                    progress='{}'.format(response.get('progress')) if response.get('progress') > -1 else '0',
                     status=response.get('statusDetailsMessage')
                     )
                 )
                 if response.get('progress') == 100:
                     return
-                elif response.get('progress')<0:
+                elif response.get('progress') < 0:
                     time.sleep(10)
                 else:
                     time.sleep(5)
@@ -218,9 +229,16 @@ class SSLLabsAssessment(object):
                 continue
 
 
-    def analyze(self, host=None, publish='off', start_new='on', from_cache='off',
-        max_age=5, return_all='done', ignore_mismatch='on', resume=False, *args, **kwargs):
+    def analyze(self, host=None, publish='off', start_new='on', from_cache='off', max_age=5,
+                return_all='done', ignore_mismatch='on', resume=False, *args, **kwargs):
+        """Start the assessment process.
 
+        This is basically a wrapper function for all the API communication which takes care of everything. Any non-default
+        behaviour of assessment processes can be tweaked with arguments to this function.
+
+        Providing a *host* containing the FQDN of the target system(s) is the only mandatory argument. All remaining
+        arguments are optional.
+        """
         if not self._check_api_info():
             return False
 
