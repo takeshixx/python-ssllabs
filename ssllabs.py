@@ -39,16 +39,17 @@ class SSLLabsAssessment(object):
 
     See the *analyze* function for more information.
 
-    For any information regarding the stable SSL Labs API, see the official documentation:
+    Note: This module defaults to the SSL Labs dev API in favour of advanced features like IPv6 support. Beware, this
+    might change in future releases. See the following documentation sources for further information:
 
-        * https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
-
-    Note: SSL Labs also provides a dev API which can also be used with this module, see:
-
-        * https://api.dev.ssllabs.com/api/v2
-        * https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
+        * dev: https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
+        * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
-    API_URL = 'https://api.ssllabs.com/api/v2/'
+    API_URLS = [
+        'https://api.dev.ssllabs.com/api/v2/',   # dev
+        'https://api.ssllabs.com/api/v2/'       # stable
+    ]
+    API_URL = None
     MAX_ASSESSMENTS = 25
     CLIENT_MAX_ASSESSMENTS = 25
     CURRENT_ASSESSMENTS = 0
@@ -103,7 +104,23 @@ class SSLLabsAssessment(object):
 
     def _check_api_info(self):
         try:
-            response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL))).json()
+            if not self.API_URL:
+                for url in self.API_URLS:
+                    try:
+                        response = self._handle_api_error(requests.get('{}/info'.format(url))).json()
+                        self.API_URL = url
+                        break
+                    except requests.ConnectionError:
+                        continue
+            else:
+                try:
+                    response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL))).json()
+                except requests.ConnectionError:
+                    self._die_on_error('[ERROR] Provided API URL is unavailable.')
+
+            if not self.API_URL:
+                self._die_on_error('[ERROR] SSL Labs APIs are down. Please try again later.')
+
             self.MAX_ASSESSMENTS = response.get('maxAssessments')
             self.CLIENT_MAX_ASSESSMENTS = response.get('clientMaxAssessments')
             self.CURRENT_ASSESSMENTS = response.get('currentAssessments')
