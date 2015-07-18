@@ -13,3 +13,13 @@ A Python interface for the Qualys SSL Labs API. It can be used as a command line
 
 * Concurrent assessments of multiple FQDNs.
 * Ability to filter assessment reports for better automation.
+
+##Terms of Use
+
+This is not an official SSL Labs project. Please make sure to read the official [Qualys SSL Labs Terms of Use](https://www.ssllabs.com/downloads/Qualys_SSL_Labs_Terms_of_Use.pdf).
+
+Also you should
+
+* only inspect sites and servers whose owners have given you permission to do so.
+* be clear that this tool works by sending assessment requests to remote SSL Labs servers and that this information will
+be shared with them.
