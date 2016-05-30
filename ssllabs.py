@@ -296,7 +296,7 @@ class SSLLabsAssessment(object):
                 else:
                     return self._get_all_results()
             elif _status.get('status') == 'ERROR':
-                print('An error occured: {}'.format(_status.get('errors'))
+                print('An error occured: {}'.format(_status.get('errors')))
                 return
             else:
                 continue
