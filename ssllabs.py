@@ -55,7 +55,7 @@ class SSLLabsAssessment(object):
     DEBUG = False
     VERBOSE = False
     QUIET = False
-    
+
     def __init__(self, host=None, debug=False, verbose=False, quiet=False, api_url=None, *args, **kwargs):
         if host:
             self.host = host
@@ -296,7 +296,7 @@ class SSLLabsAssessment(object):
                 else:
                     return self._get_all_results()
             elif _status.get('status') == 'ERROR':
-                print('An error occured: {}'.format(_status.errors))
+                print('An error occured: {}'.format(_status.get('errors'))
                 return
             else:
                 continue
@@ -335,7 +335,7 @@ class SSLLabsAssessment(object):
                 elif _host_status == 'READY':
                     return self._get_all_results()
                 elif _host_status == 'ERROR':
-                    print('[ERROR] An error occured: {}'.format(_status.errors))
+                    print('[ERROR] An error occured: {}'.format(_status.get('errors')))
                     return
                 elif _host_status == 'DNS':
                     if self.VERBOSE:
@@ -348,7 +348,7 @@ class SSLLabsAssessment(object):
         except:
             return
 
-            
+
 def main():
     cli_args = parse_arguments()
     try:
