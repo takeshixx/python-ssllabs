@@ -106,14 +106,14 @@ class SSLLabsAssessment(object):
             if not self.API_URL:
                 for url in self.API_URLS:
                     try:
-                        response = self._handle_api_error(requests.get('{}/info'.format(url))).json()
+                        response = self._handle_api_error(requests.get('{}info'.format(url))).json()
                         self.API_URL = url
                         break
                     except requests.ConnectionError:
                         continue
             else:
                 try:
-                    response = self._handle_api_error(requests.get('{}/info'.format(self.API_URL))).json()
+                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL))).json()
                 except requests.ConnectionError:
                     self._die_on_error('[ERROR] Provided API URL is unavailable.')
 
@@ -214,7 +214,7 @@ class SSLLabsAssessment(object):
             return False
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
-        url = '{api_url}/getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
+        url = '{api_url}getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
             api_url=self.API_URL,
             host=host,
             endpoint_ip=ip,
