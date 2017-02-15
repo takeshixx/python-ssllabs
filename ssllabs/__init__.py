@@ -21,7 +21,8 @@ LOGGER = logging.getLogger()
 
 def parse_arguments():
     from argparse import ArgumentParser
-    parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(version=__version__))
+    parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(
+        version=__version__))
     parser.add_argument('host', help='hostname which should be assessed')
     parser.add_argument('--resume', action='store_true', default=False,
                         help='get the status of a running assessment')
@@ -45,15 +46,19 @@ def parse_arguments():
 
 
 class SSLLabsAssessment(object):
-    """A basic API interface which eases the creation of SSL Labs assessments.
+    """A basic API interface which eases the
+    creation of SSL Labs assessments.
 
     See the *analyze* function for more information.
 
-    Note: This module defaults to the SSL Labs dev API in favour of advanced features like IPv6 support. Beware, this
-    might change in future releases. See the following documentation sources for further information:
+    Note: This module defaults to the SSL Labs dev
+    API in favour of advanced features like IPv6
+    support. Beware, this might change in future
+    releases. See the following documentation sources
+    for further information:
 
-        * dev: https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
-        * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
+    * dev: https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
+    * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
     API_URLS = [
         'https://api.dev.ssllabs.com/api/v2/',   # dev
@@ -81,7 +86,9 @@ class SSLLabsAssessment(object):
     def set_host(self, host):
         """Set the target FQDN.
 
-        This public function can be used to set the target FQDN after the object has already been initialized.
+        This public function can be used to
+        set the target FQDN after the object
+        has already been initialized.
         """
         self.host = host
 
@@ -151,14 +158,12 @@ class SSLLabsAssessment(object):
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            ignore_mismatch=self.ignore_mismatch
-        )
+            ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age
-            )
+                max_age=self.max_age)
         else:
             _url += '&startNew=on'
 
@@ -234,15 +239,21 @@ class SSLLabsAssessment(object):
                 continue
 
 
-    def analyze(self, host=None, publish='off', start_new='on', from_cache='off', max_age=5,
-                return_all='done', ignore_mismatch='on', resume=False, *args, **kwargs):
+    def analyze(self, host=None, publish='off', start_new='on',
+                from_cache='off', max_age=5, return_all='done',
+                ignore_mismatch='on', resume=False, detail=False):
         """Start the assessment process.
 
-        This is basically a wrapper function for all the API communication which takes care of everything. Any non-default
-        behaviour of assessment processes can be tweaked with arguments to this function.
+        This is basically a wrapper function
+        for all the API communication which
+        takes care of everything. Any non-default
+        behaviour of assessment processes can be
+        tweaked with arguments to this function.
 
-        Providing a *host* containing the FQDN of the target system(s) is the only mandatory argument. All remaining
-        arguments are optional.
+        Providing a *host* containing the FQDN of
+        the target system(s) is the only mandatory
+        argument. All remaining arguments are
+        optional.
         """
         if not self._check_api_info():
             return False
