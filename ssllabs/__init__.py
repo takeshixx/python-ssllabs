@@ -1,6 +1,7 @@
 import sys
 import json
 import time
+import logging
 import multiprocessing
 
 try:
@@ -15,20 +16,31 @@ __author__ = 'takeshix@adversec.com'
 __license__ = 'Apache 2.0'
 __all__ = ['SSLLabsAssessment']
 
+LOGGER = logging.getLogger()
+
 
 def parse_arguments():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(version=__version__))
     parser.add_argument('host', help='hostname which should be assessed')
-    parser.add_argument('--resume', action='store_true', default=False, help='get the status of a running assessment')
-    parser.add_argument('--publish', action='store_true', default=False, help='publish results on public results board')
-    parser.add_argument('--ignore-mismatch', action='store_true', default=False, help='certificate hostname mismatch does not stop assessment')
-    parser.add_argument('--use-cache', action='store_true', default=False, help='accept cached results (if available)')
-    parser.add_argument('--max-age', metavar='N', default=5, type=int, help='max age (in hours) of cached results')
-    parser.add_argument('--api-url', metavar='URL', default=False, help='use another API URL than the default')
-    parser.add_argument('-q', action='store_true', default=False, help='suppress any output, just print the results')
-    parser.add_argument('-v', action='store_true', default=False, help='enable verbose output')
-    parser.add_argument('-d', action='store_true', default=False, help='enable debug output')
+    parser.add_argument('--resume', action='store_true', default=False,
+                        help='get the status of a running assessment')
+    parser.add_argument('--publish', action='store_true', default=False,
+                        help='publish results on public results board')
+    parser.add_argument('--ignore-mismatch', action='store_true', default=False,
+                        help='certificate hostname mismatch does not stop assessment')
+    parser.add_argument('--use-cache', action='store_true', default=False,
+                        help='accept cached results (if available)')
+    parser.add_argument('--detail', action='store_true', default=False,
+                        help='include detailed endpoint information')
+    parser.add_argument('--max-age', metavar='N', default=5, type=int,
+                        help='max age (in hours) of cached results')
+    parser.add_argument('--api-url', metavar='URL', default=False,
+                        help='use another API URL than the default')
+    parser.add_argument('-v', action='store_const', dest='level', default=0,
+                        const=2, help='verbose logging')
+    parser.add_argument('-d', action='store_const', dest='level', default=0,
+                        const=3, help='more verbose logging (debug)')
     return parser.parse_args()
 
 
@@ -51,24 +63,20 @@ class SSLLabsAssessment(object):
     MAX_ASSESSMENTS = 25
     CLIENT_MAX_ASSESSMENTS = 25
     CURRENT_ASSESSMENTS = 0
-    DEBUG = False
-    VERBOSE = False
-    QUIET = False
 
-    def __init__(self, host=None, debug=False, verbose=False, quiet=False, api_url=None, *args, **kwargs):
+    def __init__(self, host=None, api_url=None, *args, **kwargs):
         if host:
             self.host = host
-
         if api_url:
             self.API_URL = api_url
-
-        self.DEBUG = debug
-        self.VERBOSE = verbose
-
-        if quiet:
-            self.QUIET = True
-            self.DEBUG = False
-            self.VERBOSE = False
+        self.manager = multiprocessing.Manager()
+        self.endpoint_jobs = []
+        self.publish = None
+        self.start_new = None
+        self.return_all = None
+        self.from_cache = None
+        self.max_age = None
+        self.ignore_mismatch = None
 
     def set_host(self, host):
         """Set the target FQDN.
@@ -79,18 +87,18 @@ class SSLLabsAssessment(object):
 
     def _die_on_error(self, msg):
         if msg:
-            print(msg)
+            LOGGER.error(msg)
         sys.exit(1)
 
     def _handle_api_error(self, response):
         _status = response.status_code
-
         if _status == 200:
             return response
         elif _status == 400:
             self._die_on_error('[API] invocation error: {}'.format(response.text))
         elif _status == 429:
-            self._die_on_error('[API] client request rate too high or too many new assessments too fast: {}'.format(response.text))
+            self._die_on_error('[API] client request rate too high or too many new'
+                               'assessments too fast: {}'.format(response.text))
         elif _status == 500:
             self._die_on_error('[API] internal error: {}'.format(response.text))
         elif _status == 503:
@@ -112,35 +120,29 @@ class SSLLabsAssessment(object):
                         continue
             else:
                 try:
-                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL))).json()
+                    response = self._handle_api_error(
+                        requests.get('{}info'.format(self.API_URL))).json()
                 except requests.ConnectionError:
                     self._die_on_error('[ERROR] Provided API URL is unavailable.')
 
             if not self.API_URL:
                 self._die_on_error('[ERROR] SSL Labs APIs are down. Please try again later.')
 
-            self.MAX_ASSESSMENTS = response.get('maxAssessments')
             self.CLIENT_MAX_ASSESSMENTS = response.get('clientMaxAssessments')
             self.CURRENT_ASSESSMENTS = response.get('currentAssessments')
-
+            self.MAX_ASSESSMENTS = response.get('maxAssessments')
             if self.MAX_ASSESSMENTS<=0:
-                if self.DEBUG:
-                    print('Rate limit reached')
+                LOGGER.debug('Rate limit reached')
                 return False
-
-            if not self.QUIET:
-                print('[NOTICE] SSL Labs v{engine_version} (criteria version {criteria_version})'.format(
-                    engine_version=response.get('engineVersion'),
-                    criteria_version=response.get('criteriaVersion')
-                ))
-                print('[NOTICE] {server_message}'.format(
-                    server_message=response.get('messages')[0]
-                ))
-
+            LOGGER.info('[NOTICE] SSL Labs v{engine_version} (criteria version '
+                        '{criteria_version})'.format(
+                            engine_version=response.get('engineVersion'),
+                            criteria_version=response.get('criteriaVersion')))
+            LOGGER.info('[NOTICE] {server_message}'.format(
+                server_message=response.get('messages')[0]))
             return True
         except Exception as e:
-            if self.DEBUG:
-                print(e)
+            LOGGER.error(e)
             return False
 
     def _trigger_new_assessment(self):
@@ -164,8 +166,7 @@ class SSLLabsAssessment(object):
             self._handle_api_error(requests.get(_url))
             return True
         except Exception as e:
-            if self.DEBUG:
-                print(e)
+            LOGGER.error(e)
             return False
 
     def _poll_api(self):
@@ -174,42 +175,36 @@ class SSLLabsAssessment(object):
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            ignore_mismatch=self.ignore_mismatch
-        )
+            ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age
-            )
-
+                max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except Exception as e:
-            if self.DEBUG:
-                print(e)
+            LOGGER.error(e)
             return False
 
     def _get_all_results(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&ignoreMismatch={ignore_mismatch}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&' \
+               'ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
             return_all=self.return_all,
-            ignore_mismatch=self.ignore_mismatch
-        )
+            ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age
-            )
+                max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except Exception as e:
-            if self.DEBUG:
-                print(e)
+            LOGGER.error(e)
             return False
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
@@ -217,18 +212,14 @@ class SSLLabsAssessment(object):
             api_url=self.API_URL,
             host=host,
             endpoint_ip=ip,
-            from_cache=from_cache
-        )
-
+            from_cache=from_cache)
         while True:
             try:
                 response = self._handle_api_error(requests.get(url)).json()
-                print('[INFO] [{ip_address}] Progress: {progress}%, Status: {status}'.format(
+                LOGGER.info('[{ip_address}] Progress: {progress}%, Status: {status}'.format(
                     ip_address=response.get('ipAddress'),
                     progress='{}'.format(response.get('progress')) if response.get('progress') > -1 else '0',
-                    status=response.get('statusDetailsMessage')
-                    )
-                )
+                    status=response.get('statusDetailsMessage')))
                 if response.get('progress') == 100:
                     return
                 elif response.get('progress') < 0:
@@ -238,8 +229,7 @@ class SSLLabsAssessment(object):
             except KeyboardInterrupt:
                 return
             except Exception as e:
-                if self.DEBUG:
-                    print(e)
+                LOGGER.error(e)
                 time.sleep(5)
                 continue
 
@@ -268,116 +258,94 @@ class SSLLabsAssessment(object):
         self.from_cache = from_cache
         self.max_age = max_age
         self.ignore_mismatch = ignore_mismatch
-
         if not resume:
-            if not self.QUIET:
-                print('[INFO] Retrieving assessment for {}...'.format(self.host))
-
+            LOGGER.info('Retrieving assessment for {}...'.format(self.host))
             if not self._trigger_new_assessment():
                 return False
         else:
-            if not self.QUIET:
-                print('[INFO] Checking running assessment for {}'.format(self.host))
-
+            LOGGER.info('Checking running assessment for {}'.format(self.host))
         while True:
             _status = self._poll_api()
             if _status.get('status') == 'IN_PROGRESS':
-                if not self.QUIET and resume:
-                    print('[INFO] Assessment is still in progress')
+                if resume:
+                    LOGGER.info('Assessment is still in progress')
                 break
             elif _status.get('status') == 'READY':
-                if not self.QUIET and resume:
-                    print(
-                        '[INFO] No running assessment. Use --use-cache '+
-                        'to receive a cached assessment, or start a new one.'
-                    )
+                if resume:
+                    LOGGER.info('No running assessment. Use --use-cache '
+                                'to receive a cached assessment, or start a new one.')
                     return
                 else:
                     return self._get_all_results()
             elif _status.get('status') == 'ERROR':
-                print('An error occured: {}'.format(_status.get('statusMessage')))
+                LOGGER.error('An error occured: {}'.format(_status.get('statusMessage')))
                 return
             else:
                 continue
 
-        if self.VERBOSE:
-            print('[INFO] Testing {} host(s)'.format(len(_status.get('endpoints'))))
-
-        self.manager = multiprocessing.Manager()
-        self.endpoint_jobs = []
-
+        LOGGER.debug('Testing {} host(s)'.format(len(_status.get('endpoints'))))
         try:
-            if self.VERBOSE:
+            if detail:
                 for endpoint in _status.get('endpoints'):
                     _process = multiprocessing.Process(
-                            target=self._get_detailed_endpoint_information, args=(self.host, endpoint.get('ipAddress'))
-                    )
+                                target=self._get_detailed_endpoint_information,
+                                args=(self.host, endpoint.get('ipAddress')))
                     self.endpoint_jobs.append(_process)
                     _process.start()
-
                 for job in self.endpoint_jobs:
                     job.join()
-
             while True:
                 _status = self._poll_api()
-
                 if not _status:
                     break
-
                 _host_status = _status.get('status')
-
                 if _host_status == 'IN_PROGRESS':
-                    if not self.QUIET:
+                    if logging.getLogger().getEffectiveLevel() <= 20:
                         sys.stdout.write('.')
                         sys.stdout.flush()
                     time.sleep(10)
                 elif _host_status == 'READY':
                     return self._get_all_results()
                 elif _host_status == 'ERROR':
-                    print('[ERROR] An error occured: {}'.format(_status.get('statusMessage')))
+                    LOGGER.error('[ERROR] An error occured: {}'.format(_status.get('statusMessage')))
                     return
                 elif _host_status == 'DNS':
-                    if self.VERBOSE:
-                        print('[INFO] Resolving hostname')
+                    LOGGER.debug('Resolving hostname')
                     time.sleep(4)
                 else:
-                    print('[INFO] Unknown host status: {}'.format(_host_status))
+                    LOGGER.info('Unknown host status: {}'.format(_host_status))
         except KeyboardInterrupt:
             pass
-        except:
+        except Exception as e:
+            LOGGER.error(e)
             return
 
 
 def main():
     cli_args = parse_arguments()
+    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
+    logging.basicConfig(level=levels[min(cli_args.level, len(levels) - 1)])
     try:
         assessment = SSLLabsAssessment(
             host=cli_args.host,
-            debug=cli_args.d,
-            verbose=cli_args.v,
-            quiet=cli_args.q,
-            api_url=cli_args.api_url
-        )
+            api_url=cli_args.api_url)
         info = assessment.analyze(
             ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
             from_cache='on' if cli_args.use_cache else 'off',
             max_age=cli_args.max_age,
             publish='on' if cli_args.publish else 'off',
-            resume=cli_args.resume
-        )
-
+            resume=cli_args.resume,
+            detail=cli_args.detail)
         if not info:
-            if cli_args.d:
-                print('[DEBUG] Got no report')
+            LOGGER.debug('Got no report')
             return 1
-
         # TODO: Implement proper printing of some values
-        print(json.dumps(info, indent=4, sort_keys=True))
-
+        # print(json.dumps(info, indent=4, sort_keys=True))
+        sys.stdout.write(json.dumps(info, indent=4, sort_keys=True))
+        sys.stdout.flush()
         return 0
     except Exception as e:
-        if cli_args.d:
-            print(e)
+        LOGGER.error(e)
         return 1
 
 
