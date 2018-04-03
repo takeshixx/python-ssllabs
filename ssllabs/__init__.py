@@ -8,7 +8,7 @@ try:
     import requests
 except ImportError:
     print('requests module is not available')
-    sys.exit(1)
+    raise
 
 
 __version__ = '1.2'
@@ -61,7 +61,7 @@ class SSLLabsAssessment(object):
     * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
     API_URLS = [
-        'https://api.dev.ssllabs.com/api/v2/',   # dev
+        'https://api.dev.ssllabs.com/api/v2/',  # dev
         'https://api.ssllabs.com/api/v2/'       # stable
     ]
     API_URL = None
@@ -92,10 +92,11 @@ class SSLLabsAssessment(object):
         """
         self.host = host
 
-    def _die_on_error(self, msg):
+    @staticmethod
+    def _die_on_error(msg):
         if msg:
             LOGGER.error(msg)
-        sys.exit(1)
+        raise Exception(msg)
 
     def _handle_api_error(self, response):
         _status = response.status_code
