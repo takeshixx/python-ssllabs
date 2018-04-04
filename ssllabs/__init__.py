@@ -170,10 +170,11 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age)
+                max_age=self.max_age,
+                return_all=self.return_all)
         else:
             _url += '&startNew=on'
 
@@ -194,10 +195,11 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age)
+                max_age=self.max_age,
+                return_all=self.return_all)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except AccessProblem as e:
@@ -216,10 +218,11 @@ class SSLLabsAssessment(object):
             return_all=self.return_all,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age)
+                max_age=self.max_age,
+                return_all=self.return_all)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except AccessProblem as e:
@@ -283,9 +286,9 @@ class SSLLabsAssessment(object):
 
         self.publish = publish
         self.start_new = start_new
-        self.return_all = return_all
         self.from_cache = from_cache
         self.max_age = max_age
+        self.return_all = return_all
         self.ignore_mismatch = ignore_mismatch
         if not resume:
             LOGGER.info('Retrieving assessment for {}...'.format(self.host))
@@ -364,6 +367,7 @@ def main():
             ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
             from_cache='on' if cli_args.use_cache else 'off',
             max_age=cli_args.max_age,
+            return_all='done',
             publish='on' if cli_args.publish else 'off',
             resume=cli_args.resume,
             detail=cli_args.detail)
