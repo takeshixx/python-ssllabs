@@ -45,6 +45,9 @@ def parse_arguments():
     return parser.parse_args()
 
 
+class AccessProblem(Exception):
+    pass
+
 class SSLLabsAssessment(object):
     """A basic API interface which eases the
     creation of SSL Labs assessments.
@@ -96,7 +99,7 @@ class SSLLabsAssessment(object):
     def _die_on_error(msg):
         if msg:
             LOGGER.error(msg)
-        raise Exception(msg)
+        raise AccessProblem(msg)
 
     def _handle_api_error(self, response):
         _status = response.status_code
@@ -153,6 +156,8 @@ class SSLLabsAssessment(object):
             LOGGER.info('[NOTICE] {server_message}'.format(
                 server_message=response.get('messages')[0]))
             return True
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -175,6 +180,8 @@ class SSLLabsAssessment(object):
         try:
             self._handle_api_error(requests.get(_url))
             return True
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -193,6 +200,8 @@ class SSLLabsAssessment(object):
                 max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -213,6 +222,8 @@ class SSLLabsAssessment(object):
                 max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -238,6 +249,8 @@ class SSLLabsAssessment(object):
                     time.sleep(5)
             except KeyboardInterrupt:
                 return
+            except AccessProblem as e:
+                raise
             except Exception as e:
                 LOGGER.error(e)
                 time.sleep(5)
@@ -332,6 +345,8 @@ class SSLLabsAssessment(object):
                     LOGGER.info('Unknown host status: {}'.format(_host_status))
         except KeyboardInterrupt:
             pass
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return
