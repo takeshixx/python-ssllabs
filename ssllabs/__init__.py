@@ -64,8 +64,8 @@ class SSLLabsAssessment(object):
     * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
     API_URLS = [
-        'https://api.dev.ssllabs.com/api/v3/', # dev
-        'https://api.ssllabs.com/api/v3/'       # stable
+        'https://api.dev.ssllabs.com/api/v2/', # dev
+        'https://api.ssllabs.com/api/v2/'      # stable
     ]
     API_URL = None
     MAX_ASSESSMENTS = 25
