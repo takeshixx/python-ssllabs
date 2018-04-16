@@ -170,11 +170,11 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
+            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
+                return_all=self.return_all,
                 from_cache=self.from_cache,
-                max_age=self.max_age,
-                return_all=self.return_all)
+                max_age=self.max_age)
         else:
             _url += '&startNew=on'
 
@@ -195,11 +195,11 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
+            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
+                return_all=self.return_all,
                 from_cache=self.from_cache,
-                max_age=self.max_age,
-                return_all=self.return_all)
+                max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except AccessProblem as e:
@@ -209,8 +209,7 @@ class SSLLabsAssessment(object):
             return False
 
     def _get_all_results(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&' \
-               'ignoreMismatch={ignore_mismatch}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
             host=self.host,
@@ -218,11 +217,10 @@ class SSLLabsAssessment(object):
             return_all=self.return_all,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}&all={return_all}'
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
                 from_cache=self.from_cache,
-                max_age=self.max_age,
-                return_all=self.return_all)
+                max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
         except AccessProblem as e:
