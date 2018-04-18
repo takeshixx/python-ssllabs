@@ -106,8 +106,9 @@ class SSLLabsAssessment(object):
         if _status == 200:
             return response
         errorMessage = '; '.join('{}{}{}'.format(
-                error.get('field') or '', ': ' if error.get('field') else '', error.get('message'))
-                for error in response.get('errors') or ()) \
+                error.get('field') or '', ': ' if error.get('field') else '',
+                error.get('message') or 'Unknown error')
+                for error in response.json().get('errors') or ()) \
                 or response.text
         if _status == 400:
             self._die_on_error('[API] invocation error: {}'.format(errorMessage))
@@ -135,8 +136,7 @@ class SSLLabsAssessment(object):
                         continue
             else:
                 try:
-                    response = self._handle_api_error(
-                        requests.get('{}info'.format(self.API_URL))).json()
+                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL))).json()
                 except requests.ConnectionError:
                     self._die_on_error('[ERROR] Provided API URL is unavailable.')
 
