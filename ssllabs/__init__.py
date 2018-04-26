@@ -214,8 +214,8 @@ class SSLLabsAssessment(object):
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            return_all=self.return_all,
-            ignore_mismatch=self.ignore_mismatch)
+            ignore_mismatch=self.ignore_mismatch,
+            return_all=self.return_all)
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
