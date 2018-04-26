@@ -211,6 +211,7 @@ class SSLLabsAssessment(object):
             return False
 
     def _get_all_results(self):
+        LOGGER.debug('Getting full results')
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
@@ -232,6 +233,7 @@ class SSLLabsAssessment(object):
             return False
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
+        LOGGER.debug('Getting detailed endpoint information')
         url = '{api_url}getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
             api_url=self.API_URL,
             host=host,
