@@ -105,24 +105,24 @@ class SSLLabsAssessment(object):
         _status = response.status_code
         if _status == 200:
             return response
-        errorMessage = '; '.join('{}{}{}'.format(
+        error_message = '; '.join('{}{}{}'.format(
                 error.get('field') or '', ': ' if error.get('field') else '',
                 error.get('message') or 'Unknown error')
                 for error in response.json().get('errors') or ()) \
                 or response.text
         if _status == 400:
-            self._die_on_error('[API] invocation error: {}'.format(errorMessage))
+            self._die_on_error('[API] invocation error: {}'.format(error_message))
         elif _status == 429:
             self._die_on_error('[API] client request rate too high or too many new'
-                               'assessments too fast: {}'.format(errorMessage))
+                               'assessments too fast: {}'.format(error_message))
         elif _status == 500:
-            self._die_on_error('[API] internal error: {}'.format(errorMessage))
+            self._die_on_error('[API] internal error: {}'.format(error_message))
         elif _status == 503:
-            self._die_on_error('[API] the service is not available: {}'.format(errorMessage))
+            self._die_on_error('[API] the service is not available: {}'.format(error_message))
         elif _status == 529:
-            self._die_on_error('[API] the service is overloaded: {}'.format(errorMessage))
+            self._die_on_error('[API] the service is overloaded: {}'.format(error_message))
         else:
-            self._die_on_error('[API] unknown status code: {}, {}'.format(_status, errorMessage))
+            self._die_on_error('[API] unknown status code: {}, {}'.format(_status, error_message))
 
     def _check_api_info(self):
         try:
