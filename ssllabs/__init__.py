@@ -8,7 +8,7 @@ try:
     import requests
 except ImportError:
     print('requests module is not available')
-    sys.exit(1)
+    raise
 
 
 __version__ = '1.2'
@@ -45,6 +45,9 @@ def parse_arguments():
     return parser.parse_args()
 
 
+class AccessProblem(Exception):
+    pass
+
 class SSLLabsAssessment(object):
     """A basic API interface which eases the
     creation of SSL Labs assessments.
@@ -61,8 +64,8 @@ class SSLLabsAssessment(object):
     * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
     API_URLS = [
-        'https://api.dev.ssllabs.com/api/v2/',   # dev
-        'https://api.ssllabs.com/api/v2/'       # stable
+        'https://api.dev.ssllabs.com/api/v3/', # dev
+        'https://api.ssllabs.com/api/v3/'      # stable
     ]
     API_URL = None
     MAX_ASSESSMENTS = 25
@@ -92,28 +95,34 @@ class SSLLabsAssessment(object):
         """
         self.host = host
 
-    def _die_on_error(self, msg):
+    @staticmethod
+    def _die_on_error(msg):
         if msg:
             LOGGER.error(msg)
-        sys.exit(1)
+        raise AccessProblem(msg)
 
     def _handle_api_error(self, response):
         _status = response.status_code
         if _status == 200:
             return response
-        elif _status == 400:
-            self._die_on_error('[API] invocation error: {}'.format(response.text))
+        error_message = '; '.join('{}{}{}'.format(
+                error.get('field') or '', ': ' if error.get('field') else '',
+                error.get('message') or 'Unknown error')
+                for error in response.json().get('errors') or ()) \
+                or response.text
+        if _status == 400:
+            self._die_on_error('[API] invocation error: {}'.format(error_message))
         elif _status == 429:
             self._die_on_error('[API] client request rate too high or too many new'
-                               'assessments too fast: {}'.format(response.text))
+                               'assessments too fast: {}'.format(error_message))
         elif _status == 500:
-            self._die_on_error('[API] internal error: {}'.format(response.text))
+            self._die_on_error('[API] internal error: {}'.format(error_message))
         elif _status == 503:
-            self._die_on_error('[API] the service is not available: {}'.format(response.text))
+            self._die_on_error('[API] the service is not available: {}'.format(error_message))
         elif _status == 529:
-            self._die_on_error('[API] the service is overloaded: {}'.format(response.text))
+            self._die_on_error('[API] the service is overloaded: {}'.format(error_message))
         else:
-            self._die_on_error('[API] unknown status code: {}, {}'.format(_status, response.text))
+            self._die_on_error('[API] unknown status code: {}, {}'.format(_status, error_message))
 
     def _check_api_info(self):
         try:
@@ -127,8 +136,7 @@ class SSLLabsAssessment(object):
                         continue
             else:
                 try:
-                    response = self._handle_api_error(
-                        requests.get('{}info'.format(self.API_URL))).json()
+                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL))).json()
                 except requests.ConnectionError:
                     self._die_on_error('[ERROR] Provided API URL is unavailable.')
 
@@ -148,6 +156,8 @@ class SSLLabsAssessment(object):
             LOGGER.info('[NOTICE] {server_message}'.format(
                 server_message=response.get('messages')[0]))
             return True
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -160,8 +170,9 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
+                return_all=self.return_all,
                 from_cache=self.from_cache,
                 max_age=self.max_age)
         else:
@@ -170,6 +181,8 @@ class SSLLabsAssessment(object):
         try:
             self._handle_api_error(requests.get(_url))
             return True
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -182,19 +195,21 @@ class SSLLabsAssessment(object):
             publish=self.publish,
             ignore_mismatch=self.ignore_mismatch)
         if self.from_cache == 'on':
-            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
+                return_all=self.return_all,
                 from_cache=self.from_cache,
                 max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
 
     def _get_all_results(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&' \
-               'ignoreMismatch={ignore_mismatch}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
             host=self.host,
@@ -208,6 +223,8 @@ class SSLLabsAssessment(object):
                 max_age=self.max_age)
         try:
             return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return False
@@ -233,6 +250,8 @@ class SSLLabsAssessment(object):
                     time.sleep(5)
             except KeyboardInterrupt:
                 return
+            except AccessProblem as e:
+                raise
             except Exception as e:
                 LOGGER.error(e)
                 time.sleep(5)
@@ -265,9 +284,9 @@ class SSLLabsAssessment(object):
 
         self.publish = publish
         self.start_new = start_new
-        self.return_all = return_all
         self.from_cache = from_cache
         self.max_age = max_age
+        self.return_all = return_all
         self.ignore_mismatch = ignore_mismatch
         if not resume:
             LOGGER.info('Retrieving assessment for {}...'.format(self.host))
@@ -327,6 +346,8 @@ class SSLLabsAssessment(object):
                     LOGGER.info('Unknown host status: {}'.format(_host_status))
         except KeyboardInterrupt:
             pass
+        except AccessProblem as e:
+            raise
         except Exception as e:
             LOGGER.error(e)
             return
@@ -344,6 +365,7 @@ def main():
             ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
             from_cache='on' if cli_args.use_cache else 'off',
             max_age=cli_args.max_age,
+            return_all='done',
             publish='on' if cli_args.publish else 'off',
             resume=cli_args.resume,
             detail=cli_args.detail)
