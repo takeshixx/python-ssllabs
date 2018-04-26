@@ -11,7 +11,7 @@ except ImportError:
     raise
 
 
-__version__ = '1.2'
+__version__ = '1.3'
 __author__ = 'takeshix@adversec.com'
 __license__ = 'Apache 2.0'
 __all__ = ['SSLLabsAssessment']
