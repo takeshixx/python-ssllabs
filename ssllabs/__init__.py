@@ -161,7 +161,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return False
 
     def _trigger_new_assessment(self):
@@ -186,7 +186,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return False
 
     def _poll_api(self):
@@ -207,7 +207,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return False
 
     def _get_all_results(self):
@@ -229,7 +229,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return False
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
@@ -257,7 +257,7 @@ class SSLLabsAssessment(object):
             except AccessProblem as e:
                 raise
             except Exception as e:
-                LOGGER.error(e)
+                LOGGER.exception(e)
                 time.sleep(5)
                 continue
 
@@ -353,7 +353,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return
 
 
@@ -382,7 +382,7 @@ def main():
         sys.stdout.flush()
         return 0
     except Exception as e:
-        LOGGER.error(e)
+        LOGGER.exception(e)
         return 1
 
 
