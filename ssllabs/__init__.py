@@ -104,7 +104,9 @@ class SSLLabsAssessment(object):
     def _handle_api_error(self, response):
         _status = response.status_code
         if _status == 200:
-            return response
+            ret = response.json()
+            LOGGER.debug('API return: %s', ret)
+            return ret
         error_message = '; '.join('{}{}{}'.format(
                 error.get('field') or '', ': ' if error.get('field') else '',
                 error.get('message') or 'Unknown error')
@@ -129,14 +131,14 @@ class SSLLabsAssessment(object):
             if not self.API_URL:
                 for url in self.API_URLS:
                     try:
-                        response = self._handle_api_error(requests.get('{}info'.format(url))).json()
+                        response = self._handle_api_error(requests.get('{}info'.format(url)))
                         self.API_URL = url
                         break
                     except requests.ConnectionError:
                         continue
             else:
                 try:
-                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL))).json()
+                    response = self._handle_api_error(requests.get('{}info'.format(self.API_URL)))
                 except requests.ConnectionError:
                     self._die_on_error('[ERROR] Provided API URL is unavailable.')
 
@@ -201,7 +203,7 @@ class SSLLabsAssessment(object):
                 from_cache=self.from_cache,
                 max_age=self.max_age)
         try:
-            return self._handle_api_error(requests.get(_url)).json()
+            return self._handle_api_error(requests.get(_url))
         except AccessProblem as e:
             raise
         except Exception as e:
@@ -222,7 +224,7 @@ class SSLLabsAssessment(object):
                 from_cache=self.from_cache,
                 max_age=self.max_age)
         try:
-            return self._handle_api_error(requests.get(_url)).json()
+            return self._handle_api_error(requests.get(_url))
         except AccessProblem as e:
             raise
         except Exception as e:
@@ -237,7 +239,7 @@ class SSLLabsAssessment(object):
             from_cache=from_cache)
         while True:
             try:
-                response = self._handle_api_error(requests.get(url)).json()
+                response = self._handle_api_error(requests.get(url))
                 LOGGER.info('[{ip_address}] Progress: {progress}%, Status: {status}'.format(
                     ip_address=response.get('ipAddress'),
                     progress='{}'.format(response.get('progress')) if response.get('progress') > -1 else '0',
