@@ -188,7 +188,6 @@ class SSLLabsAssessment(object):
             return False
 
     def _poll_api(self):
-        LOGGER.debug('Polling')
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
@@ -210,7 +209,7 @@ class SSLLabsAssessment(object):
             return False
 
     def _get_all_results(self):
-        LOGGER.debug('Getting full results')
+        LOGGER.debug('Requesting full results')
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
