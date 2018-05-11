@@ -104,6 +104,7 @@ class SSLLabsAssessment(object):
     def _handle_api_error(self, response):
         _status = response.status_code
         if _status == 200:
+            LOGGER.debug('API return: %s', response.json())
             return response
         error_message = '; '.join('{}{}{}'.format(
                 error.get('field') or '', ': ' if error.get('field') else '',
@@ -178,7 +179,7 @@ class SSLLabsAssessment(object):
         else:
             _url += '&startNew=on'
         try:
-            return self._handle_api_error(requests.get(_url))
+            return self._handle_api_error(requests.get(_url)).json()
         except AccessProblem as e:
             raise
         except Exception as e:
