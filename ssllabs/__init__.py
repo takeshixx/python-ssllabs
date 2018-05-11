@@ -104,6 +104,7 @@ class SSLLabsAssessment(object):
     def _handle_api_error(self, response):
         _status = response.status_code
         if _status == 200:
+            LOGGER.debug('API return: %s', response.json())
             return response
         error_message = '; '.join('{}{}{}'.format(
                 error.get('field') or '', ': ' if error.get('field') else '',
@@ -159,63 +160,40 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return False
 
     def _trigger_new_assessment(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
-        _url = _url.format(
-            api_url=self.API_URL,
-            host=self.host,
-            publish=self.publish,
-            ignore_mismatch=self.ignore_mismatch)
-        if self.from_cache == 'on':
-            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
-            _url = _url.format(
-                return_all=self.return_all,
-                from_cache=self.from_cache,
-                max_age=self.max_age)
-        else:
-            _url += '&startNew=on'
-
-        try:
-            self._handle_api_error(requests.get(_url))
-            return True
-        except AccessProblem as e:
-            raise
-        except Exception as e:
-            LOGGER.error(e)
-            return False
-
-    def _poll_api(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}'
-        _url = _url.format(
-            api_url=self.API_URL,
-            host=self.host,
-            publish=self.publish,
-            ignore_mismatch=self.ignore_mismatch)
-        if self.from_cache == 'on':
-            _url += '&all={return_all}&fromCache={from_cache}&maxAge={max_age}'
-            _url = _url.format(
-                return_all=self.return_all,
-                from_cache=self.from_cache,
-                max_age=self.max_age)
-        try:
-            return self._handle_api_error(requests.get(_url)).json()
-        except AccessProblem as e:
-            raise
-        except Exception as e:
-            LOGGER.error(e)
-            return False
-
-    def _get_all_results(self):
         _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
         _url = _url.format(
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
-            return_all=self.return_all,
-            ignore_mismatch=self.ignore_mismatch)
+            ignore_mismatch=self.ignore_mismatch,
+            return_all=self.return_all)
+        if self.from_cache == 'on':
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url = _url.format(
+                from_cache=self.from_cache,
+                max_age=self.max_age)
+        else:
+            _url += '&startNew=on'
+        try:
+            return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
+        except Exception as e:
+            LOGGER.exception(e)
+            return False
+
+    def _poll_api(self):
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
+        _url = _url.format(
+            api_url=self.API_URL,
+            host=self.host,
+            publish=self.publish,
+            ignore_mismatch=self.ignore_mismatch,
+            return_all=self.return_all)
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
@@ -226,10 +204,33 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
+            return False
+
+    def _get_all_results(self):
+        LOGGER.debug('Requesting full results')
+        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
+        _url = _url.format(
+            api_url=self.API_URL,
+            host=self.host,
+            publish=self.publish,
+            ignore_mismatch=self.ignore_mismatch,
+            return_all=self.return_all)
+        if self.from_cache == 'on':
+            _url += '&fromCache={from_cache}&maxAge={max_age}'
+            _url = _url.format(
+                from_cache=self.from_cache,
+                max_age=self.max_age)
+        try:
+            return self._handle_api_error(requests.get(_url)).json()
+        except AccessProblem as e:
+            raise
+        except Exception as e:
+            LOGGER.exception(e)
             return False
 
     def _get_detailed_endpoint_information(self, host, ip, from_cache='off'):
+        LOGGER.debug('Getting detailed endpoint information')
         url = '{api_url}getEndpointData?host={host}&s={endpoint_ip}&fromCache={from_cache}'.format(
             api_url=self.API_URL,
             host=host,
@@ -253,7 +254,7 @@ class SSLLabsAssessment(object):
             except AccessProblem as e:
                 raise
             except Exception as e:
-                LOGGER.error(e)
+                LOGGER.exception(e)
                 time.sleep(5)
                 continue
 
@@ -290,12 +291,22 @@ class SSLLabsAssessment(object):
         self.ignore_mismatch = ignore_mismatch
         if not resume:
             LOGGER.info('Retrieving assessment for {}...'.format(self.host))
-            if not self._trigger_new_assessment():
+            _status =  self._trigger_new_assessment()
+            if not _status:
                 return False
+            if _status.get('status') == 'READY':
+                if self.return_all in ('on', 'done'):
+                    return _status
+            elif _status.get('status') == 'ERROR':
+                LOGGER.error('An error occured: {}'.format(_status.get('statusMessage')))
+                return
         else:
             LOGGER.info('Checking running assessment for {}'.format(self.host))
         while True:
             _status = self._poll_api()
+            if not _status:
+                LOGGER.debug('Poll failed')
+                break
             if _status.get('status') == 'IN_PROGRESS':
                 if resume:
                     LOGGER.info('Assessment is still in progress')
@@ -306,7 +317,7 @@ class SSLLabsAssessment(object):
                                 'to receive a cached assessment, or start a new one.')
                     return
                 else:
-                    return self._get_all_results()
+                    return _status if self.return_all in ('on', 'done') else self._get_all_results()
             elif _status.get('status') == 'ERROR':
                 LOGGER.error('An error occured: {}'.format(_status.get('statusMessage')))
                 return
@@ -335,7 +346,7 @@ class SSLLabsAssessment(object):
                         sys.stdout.flush()
                     time.sleep(10)
                 elif _host_status == 'READY':
-                    return self._get_all_results()
+                    return _status if self.return_all in ('on', 'done') else self._get_all_results()
                 elif _host_status == 'ERROR':
                     LOGGER.error('[ERROR] An error occured: {}'.format(_status.get('statusMessage')))
                     return
@@ -349,7 +360,7 @@ class SSLLabsAssessment(object):
         except AccessProblem as e:
             raise
         except Exception as e:
-            LOGGER.error(e)
+            LOGGER.exception(e)
             return
 
 
@@ -378,7 +389,7 @@ def main():
         sys.stdout.flush()
         return 0
     except Exception as e:
-        LOGGER.error(e)
+        LOGGER.exception(e)
         return 1
 
 
