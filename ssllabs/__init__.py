@@ -306,7 +306,7 @@ class SSLLabsAssessment(object):
             _status = self._poll_api()
             if not _status:
                 LOGGER.debug('Poll failed')
-                break
+                continue
             if _status.get('status') == 'IN_PROGRESS':
                 if resume:
                     LOGGER.info('Assessment is still in progress')
@@ -321,8 +321,6 @@ class SSLLabsAssessment(object):
             elif _status.get('status') == 'ERROR':
                 LOGGER.error('An error occured: {}'.format(_status.get('statusMessage')))
                 return
-            else:
-                continue
 
         LOGGER.debug('Testing {} host(s)'.format(len(_status.get('endpoints'))))
         try:
@@ -338,7 +336,8 @@ class SSLLabsAssessment(object):
             while True:
                 _status = self._poll_api()
                 if not _status:
-                    break
+                    LOGGER.debug('Poll failed')
+                    continue
                 _host_status = _status.get('status')
                 if _host_status == 'IN_PROGRESS':
                     if logging.getLogger().getEffectiveLevel() <= 20:
