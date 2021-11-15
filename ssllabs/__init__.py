@@ -107,13 +107,13 @@ class SSLLabsAssessment(object):
             LOGGER.debug('API return: %s', response.json())
             return response
         try:
-            json = response.json()
+            jsonData = response.json()
         except json.JSONDecodeError:
-            json = {}
+            jsonData = {}
         error_message = '; '.join('{}{}{}'.format(
                 error.get('field') or '', ': ' if error.get('field') else '',
                 error.get('message') or 'Unknown error')
-                for error in json.get('errors') or ()) \
+                for error in jsonData.get('errors') or ()) \
                 or response.text
         if _status == 400:
             self._die_on_error('[API] invocation error: {}'.format(error_message))
