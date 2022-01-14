@@ -1,11 +1,12 @@
 from setuptools import setup
-import ssllabs
+from ssllabs import vars
 
 setup(name='python-ssllabs',
-    version=ssllabs.__version__,
+    version=vars.__version__,
     packages=['ssllabs'],
     scripts=['ssllabs-cli.py'],
     install_requires=['requests'],
     url='https://github.com/takeshixx/python-ssllabs',
-    license='Apache 2.0',
-    author='takeshix')
+    license=vars.__license__,
+    author='takeshix',
+    author_email='takeshix@adversec.com')

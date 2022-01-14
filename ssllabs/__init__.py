@@ -4,16 +4,14 @@ import time
 import logging
 import multiprocessing
 
+from .vars import *
+
 try:
     import requests
 except ImportError:
     print('requests module is not available')
     raise
 
-
-__version__ = '1.3'
-__author__ = 'takeshix@adversec.com'
-__license__ = 'Apache 2.0'
 __all__ = ['SSLLabsAssessment']
 
 LOGGER = logging.getLogger()
