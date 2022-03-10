@@ -4,7 +4,7 @@ import time
 import logging
 import multiprocessing
 
-from .vars import *
+from .vars import version
 
 try:
     import requests
@@ -20,7 +20,7 @@ LOGGER = logging.getLogger()
 def parse_arguments():
     from argparse import ArgumentParser
     parser = ArgumentParser(description='Qualys SSL Labs API client v{version}'.format(
-        version=__version__))
+        version=version))
     parser.add_argument('host', help='hostname which should be assessed')
     parser.add_argument('--resume', action='store_true', default=False,
                         help='get the status of a running assessment')

@@ -1,2 +1,2 @@
-__version__ = '1.4'
-__license__ = 'Apache 2.0'
+version = '1.4'
+license = 'Apache 2.0'
