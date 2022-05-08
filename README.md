@@ -9,6 +9,15 @@ A Python interface for the Qualys SSL Labs API. It can be used as a command line
 * Verbose output, showing progress of running endpoint assessments.
 * Retrieve assessments from cache.
 
+## Installing
+
+```bash
+git clone git@github.com:takeshixx/python-ssllabs.git
+cd python-ssllabs
+pip3 install .
+ssllabs-cli.py --help
+```
+
 ## Using the CLI
 
 The CLI by default only prints the scanning results as a JSON object to stdout. It is recommended to parse this output with tools like [jq](https://stedolan.github.io/jq/) to extract the preferred fields. The following examples show how specific fields can be extracted.
