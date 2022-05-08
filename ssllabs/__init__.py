@@ -69,6 +69,7 @@ class SSLLabsAssessment(object):
     MAX_ASSESSMENTS = 25
     CLIENT_MAX_ASSESSMENTS = 25
     CURRENT_ASSESSMENTS = 0
+    NEW_ASSESSMENT_COOLOFF = 0 # milliseconds
 
     def __init__(self, host=None, api_url=None, *args, **kwargs):
         if host:
@@ -149,8 +150,9 @@ class SSLLabsAssessment(object):
             self.CLIENT_MAX_ASSESSMENTS = response.get('clientMaxAssessments')
             self.CURRENT_ASSESSMENTS = response.get('currentAssessments')
             self.MAX_ASSESSMENTS = response.get('maxAssessments')
+            self.NEW_ASSESSMENT_COOLOFF = response.get('newAssessmentCoolOff')
             if self.MAX_ASSESSMENTS<=0:
-                LOGGER.debug('Rate limit reached')
+                LOGGER.warning('Rate limit reached. Please wait for {} seconds before submitting an assessment again.'.format(self.NEW_ASSESSMENT_COOLOFF/1000))
                 return False
             LOGGER.info('[NOTICE] SSL Labs v{engine_version} (criteria version '
                         '{criteria_version})'.format(
