@@ -58,7 +58,7 @@ class SSLLabsAssessment(object):
     releases. See the following documentation sources
     for further information:
 
-    * dev: https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs.md
+    * dev: https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs-v3.md
     * stable: https://github.com/ssllabs/ssllabs-scan/blob/stable/ssllabs-api-docs.md
     """
     API_URLS = [
@@ -78,11 +78,12 @@ class SSLLabsAssessment(object):
             self.API_URL = api_url
         self.manager = multiprocessing.Manager()
         self.endpoint_jobs = []
+        # Variables populated from arguments of analyze()
         self.publish = None
         self.start_new = None
-        self.return_all = None
         self.from_cache = None
         self.max_age = None
+        self.return_all = None
         self.ignore_mismatch = None
 
     def set_host(self, host):
@@ -168,13 +169,14 @@ class SSLLabsAssessment(object):
             return False
 
     def _trigger_new_assessment(self):
-        _url = '{api_url}analyze?host={host}&publish={publish}&ignoreMismatch={ignore_mismatch}&all={return_all}'
+        _url = '{api_url}analyze?host={host}&publish={publish}&all={return_all}&ignoreMismatch={ignore_mismatch}'
         _url = _url.format(
             api_url=self.API_URL,
             host=self.host,
             publish=self.publish,
+            return_all=self.return_all
             ignore_mismatch=self.ignore_mismatch,
-            return_all=self.return_all)
+            )
         if self.from_cache == 'on':
             _url += '&fromCache={from_cache}&maxAge={max_age}'
             _url = _url.format(
@@ -376,11 +378,11 @@ def main():
             host=cli_args.host,
             api_url=cli_args.api_url)
         info = assessment.analyze(
-            ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
+            publish='on' if cli_args.publish else 'off',
             from_cache='on' if cli_args.use_cache else 'off',
             max_age=cli_args.max_age,
             return_all='done',
-            publish='on' if cli_args.publish else 'off',
+            ignore_mismatch='off' if cli_args.ignore_mismatch else 'on',
             resume=cli_args.resume,
             detail=cli_args.detail)
         if not info:
